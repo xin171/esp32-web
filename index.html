@@ -1,6 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>ESP32 控制页</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 40px; }
+    button { padding: 12px 24px; font-size: 18px; margin: 10px; }
+  </style>
+</head>
 <body>
-  <h1>hello esp32</h1>
+
+<h2>ESP32 远程控制</h2>
+
+<button onclick="send('on')">开灯</button>
+<button onclick="send('off')">关灯</button>
+
+<p id="status"></p>
+
+<script>
+  const FC_URL = "https://你的FC域名";
+
+  function send(cmd) {
+    fetch(FC_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": "my-secret-2026"
+      },
+      body: JSON.stringify({ cmd })
+    })
+    .then(r => r.text())
+    .then(msg => {
+      document.getElementById("status").innerText = msg;
+    })
+    .catch(err => {
+      document.getElementById("status").innerText = "请求失败";
+    });
+  }
+</script>
+
 </body>
 </html>
