@@ -478,10 +478,11 @@
 <script>
 // ===================== 配置 =====================
 const MQTT_CONFIG = {
-  server:      'wss://broker.hivemq.com:8884/mqtt',
-  topic:       'esp32/wokwi/led',
-  statusTopic: 'esp32/wokwi/led/status',
-  clientId:    'xin_html_' + Math.random().toString(36).slice(2, 8),
+  server:         'wss://broker.hivemq.com:8884/mqtt',
+  topic:          'esp32/wokwi/led',
+  statusTopic:    'esp32/wokwi/led/status',
+  statusReqTopic: 'esp32/wokwi/led/status/req',
+  clientId:       'xin_html_' + Math.random().toString(36).slice(2, 8),
 };
 
 // ===================== DOM 引用 =====================
@@ -700,13 +701,30 @@ function connectMQTT() {
         }
       });
 
-      // 订阅 ESP32 状态主题 (led 实时状态反馈)
+      // 订阅 ESP32 状态主题，订阅确认后再请求状态（确保订阅先注册到 broker）
       client.subscribe(MQTT_CONFIG.statusTopic, { qos: 0 }, (err, granted) => {
         if (err) {
           addLog('❌', `订阅状态主题失败: ${err.message}`);
         } else {
           const qos = (granted && granted[0]) ? granted[0].qos : 0;
           addLog('📡', `已订阅状态 ${MQTT_CONFIG.statusTopic} (QoS ${qos})`);
+
+          // 订阅确认后 → 请求 ESP32 当前状态
+          // 双通道发送：主通道（请求主题）+ 备用通道（控制主题）
+          // ESP32 通过主题匹配或负载匹配检测 "request"
+          client.publish(MQTT_CONFIG.statusReqTopic, 'request', { qos: 0 }, (err2) => {
+            if (err2) {
+              addLog('❌', `状态请求主题发送失败: ${err2.message}`);
+            } else {
+              addLog('📤', `已发送状态请求 (${MQTT_CONFIG.statusReqTopic})`);
+            }
+          });
+          // 备用通道：也在控制主题发送 "request"
+          client.publish(MQTT_CONFIG.topic, 'request', { qos: 0 }, (err2) => {
+            if (err2) {
+              addLog('❌', `控制主题备用请求失败: ${err2.message}`);
+            }
+          });
         }
       });
 
