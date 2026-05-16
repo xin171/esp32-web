@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ESP32 LED 控制器</title>
+  <title>ESP32 LED 控制器 v2</title>
   <!-- 使用 CDN 加载 mqtt.js（无需安装，浏览器直接运行） -->
   <script src="https://unpkg.com/mqtt@5.10.3/dist/mqtt.min.js"></script>
   <style>
@@ -16,7 +16,7 @@
       min-height: 100vh;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start;
       padding: 20px;
     }
 
@@ -25,8 +25,9 @@
       border-radius: 16px;
       padding: 30px;
       width: 100%;
-      max-width: 480px;
+      max-width: 520px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      margin-top: 10px;
     }
 
     h1 {
@@ -40,10 +41,10 @@
       text-align: center;
       font-size: 13px;
       color: #888;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
     }
 
-    /* 连接状态 */
+    /* ===== 连接状态 ===== */
     .status-bar {
       display: flex;
       align-items: center;
@@ -51,7 +52,7 @@
       background: #0f3460;
       padding: 12px 16px;
       border-radius: 10px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
 
     .status-dot {
@@ -62,70 +63,76 @@
       flex-shrink: 0;
       transition: background 0.3s;
     }
-
-    .status-dot.connected {
-      background: #4caf50;
-      box-shadow: 0 0 8px #4caf50;
-    }
-
-    .status-dot.disconnected {
-      background: #f44336;
-      box-shadow: 0 0 8px #f44336;
-    }
-
-    .status-dot.connecting {
-      background: #ff9800;
-      box-shadow: 0 0 8px #ff9800;
-      animation: pulse 1s infinite;
-    }
+    .status-dot.connected   { background: #4caf50; box-shadow: 0 0 8px #4caf50; }
+    .status-dot.disconnected { background: #f44336; box-shadow: 0 0 8px #f44336; }
+    .status-dot.connecting   { background: #ff9800; box-shadow: 0 0 8px #ff9800; animation: pulse 1s infinite; }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
     }
 
-    .status-text {
-      font-size: 14px;
-      flex: 1;
-    }
+    .status-text { font-size: 14px; flex: 1; }
+    .status-detail { font-size: 11px; color: #999; }
 
-    .status-detail {
+    .btn-reconnect {
+      background: none;
+      border: 1px solid #555;
+      color: #aaa;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
       font-size: 11px;
-      color: #999;
+      flex-shrink: 0;
+    }
+    .btn-reconnect:hover { background: #333; color: #eee; }
+
+    /* ===== 统计信息 ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .stat-item {
+      background: #0f3460;
+      padding: 6px 8px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat-item .num {
+      font-size: 16px;
+      font-weight: bold;
+      color: #4fc3f7;
+    }
+    .stat-item .lbl {
+      font-size: 9px;
+      color: #888;
     }
 
-    /* 服务器信息 */
+    /* ===== 服务器信息 ===== */
     .info-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 20px;
+      gap: 6px;
+      margin-bottom: 16px;
     }
-
     .info-item {
       background: #0f3460;
-      padding: 10px 14px;
+      padding: 8px 12px;
       border-radius: 8px;
       font-size: 12px;
     }
+    .info-item .label { color: #888; margin-bottom: 2px; }
+    .info-item .value { color: #eee; font-family: monospace; font-size: 13px; }
+    .info-item .value.warn { color: #ffb74d; }
 
-    .info-item .label {
-      color: #888;
-      margin-bottom: 2px;
-    }
-
-    .info-item .value {
-      color: #eee;
-      font-family: monospace;
-      font-size: 13px;
-    }
-
-    /* 控制按钮 */
+    /* ===== 控制按钮 ===== */
     .controls {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 20px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
 
     .btn {
@@ -135,53 +142,78 @@
       font-size: 18px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.15s;
       color: #fff;
+      position: relative;
+      user-select: none;
     }
-
-    .btn:active {
-      transform: scale(0.96);
-    }
-
-    .btn:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-      transform: none;
-    }
+    .btn:active { transform: scale(0.94); }
+    .btn:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
 
     .btn-on {
       background: #e94560;
     }
-
     .btn-on:hover:not(:disabled) {
       background: #d63851;
       box-shadow: 0 0 20px rgba(233,69,96,0.4);
+    }
+    .btn-on.sending {
+      background: #b71c1c;
+      box-shadow: 0 0 30px rgba(233,69,96,0.7);
     }
 
     .btn-off {
       background: #333;
     }
-
     .btn-off:hover:not(:disabled) {
       background: #444;
     }
+    .btn-off.sending {
+      background: #000;
+      box-shadow: 0 0 20px rgba(100,100,100,0.3);
+    }
 
-    /* 消息日志 */
+    /* ===== 辅助按钮行 ===== */
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-sm {
+      padding: 8px 14px;
+      border: 1px solid #555;
+      border-radius: 6px;
+      background: #0f3460;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+      flex: 1;
+      min-width: 80px;
+      text-align: center;
+    }
+    .btn-sm:hover { background: #1a4a80; color: #fff; }
+    .btn-sm:disabled { opacity: 0.3; cursor: not-allowed; }
+    .btn-sm.active { background: #4caf50; border-color: #4caf50; color: #fff; }
+    .btn-sm.danger { border-color: #e94560; color: #e94560; }
+    .btn-sm.danger:hover { background: #e94560; color: #fff; }
+
+    /* ===== 消息日志 ===== */
     .log-section {
       background: #0f3460;
       border-radius: 10px;
       overflow: hidden;
     }
-
     .log-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 14px;
+      padding: 8px 14px;
       background: #0a2647;
       font-size: 13px;
     }
-
     .log-clear {
       background: none;
       border: 1px solid #555;
@@ -191,61 +223,149 @@
       cursor: pointer;
       font-size: 11px;
     }
-
-    .log-clear:hover {
-      background: #333;
-      color: #eee;
-    }
+    .log-clear:hover { background: #333; color: #eee; }
 
     .log-body {
-      height: 180px;
+      height: 200px;
       overflow-y: auto;
-      padding: 8px 14px;
+      padding: 6px 14px;
       font-family: monospace;
       font-size: 12px;
-      line-height: 1.6;
+      line-height: 1.7;
+    }
+    .log-body::-webkit-scrollbar { width: 4px; }
+    .log-body::-webkit-scrollbar-thumb { background: #555; border-radius: 2px; }
+
+    .log-entry { padding: 1px 0; border-bottom: 1px solid #1a1a3e; }
+    .log-entry .time { color: #666; margin-right: 8px; }
+    .log-entry .tag-sent { color: #4fc3f7; }
+    .log-entry .tag-recv { color: #81c784; }
+    .log-entry .tag-info { color: #ffb74d; }
+    .log-entry .tag-err  { color: #e57373; }
+    .log-entry .tag-ok   { color: #69f0ae; }
+    .log-empty { color: #555; text-align: center; padding-top: 40px; }
+
+    /* ===== 最后消息 ===== */
+    .last-msg {
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: #0a2647;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: monospace;
+      min-height: 36px;
+    }
+    .last-msg .lbl { color: #666; margin-right: 6px; }
+    .last-msg .val { color: #4fc3f7; }
+    .last-msg .val.recv { color: #81c784; }
+
+    /* ===== ESP32 实时状态 ===== */
+    .esp32-status {
+      background: #0f3460;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
     }
 
-    .log-body::-webkit-scrollbar {
-      width: 4px;
+    .esp32-led-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
 
-    .log-body::-webkit-scrollbar-thumb {
-      background: #555;
-      border-radius: 2px;
+    .esp32-led-lbl {
+      font-size: 12px;
+      color: #888;
     }
 
-    .log-entry {
-      padding: 2px 0;
-      border-bottom: 1px solid #1a1a3e;
+    .esp32-led-container {
+      display: flex;
+      align-items: center;
+      gap: 16px;
     }
 
-    .log-entry .time {
-      color: #666;
-      margin-right: 8px;
+    .esp32-led {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
     }
 
-    .log-entry .tag-sent {
-      color: #4fc3f7;
+    .led-bulb {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #333;
+      border: 2px solid #555;
+      transition: all 0.3s;
+      position: relative;
     }
 
-    .log-entry .tag-recv {
-      color: #81c784;
+    .led-bulb.on {
+      background: #e94560;
+      border-color: #e94560;
+      box-shadow: 0 0 20px rgba(233,69,96,0.7), 0 0 40px rgba(233,69,96,0.3);
+      animation: ledGlow 1.5s ease-in-out infinite;
     }
 
-    .log-entry .tag-info {
-      color: #ffb74d;
+    .led-bulb.off {
+      background: #222;
+      border-color: #444;
+      box-shadow: none;
+      animation: none;
     }
 
-    .log-entry .tag-err {
-      color: #e57373;
+    .led-bulb.unknown {
+      background: #333;
+      border-color: #555;
+      animation: ledPulse 2s ease-in-out infinite;
     }
 
-    .log-empty {
-      color: #555;
-      text-align: center;
-      padding-top: 40px;
+    @keyframes ledGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(233,69,96,0.7), 0 0 40px rgba(233,69,96,0.3); }
+      50% { box-shadow: 0 0 30px rgba(233,69,96,0.9), 0 0 60px rgba(233,69,96,0.5); }
     }
+
+    @keyframes ledPulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 1; }
+    }
+
+    .led-label {
+      font-size: 11px;
+      font-weight: bold;
+      color: #999;
+    }
+    .led-label.on { color: #e94560; }
+    .led-label.off { color: #666; }
+
+    .esp32-info {
+      flex: 1;
+      font-size: 11px;
+      font-family: monospace;
+      line-height: 1.7;
+    }
+    .esp32-info-row .key { color: #666; margin-right: 4px; }
+    .esp32-info-row .val { color: #aaa; word-break: break-all; }
+    .esp32-info-row .val.live { color: #81c784; }
+
+    /* ===== 诊断面板 ===== */
+    .diag-panel {
+      margin-top: 8px;
+      margin-bottom: 16px;
+      padding: 10px 14px;
+      background: #0a2647;
+      border-radius: 8px;
+      font-size: 11px;
+      font-family: monospace;
+      line-height: 1.8;
+      display: none;
+    }
+    .diag-panel.visible { display: block; }
+    .diag-panel .row { display: flex; }
+    .diag-panel .key { color: #666; width: 90px; flex-shrink: 0; }
+    .diag-panel .val { color: #aaa; word-break: break-all; }
   </style>
 </head>
 <body>
@@ -261,6 +381,15 @@
       <div class="status-text" id="statusText">未连接</div>
       <div class="status-detail" id="statusDetail">点击下方按钮开始</div>
     </div>
+    <button class="btn-reconnect" id="btnReconnect">🔄 重连</button>
+  </div>
+
+  <!-- 统计 -->
+  <div class="stats-grid">
+    <div class="stat-item"><div class="num" id="statSent">0</div><div class="lbl">已发送</div></div>
+    <div class="stat-item"><div class="num" id="statRecv">0</div><div class="lbl">已接收</div></div>
+    <div class="stat-item"><div class="num" id="statUptime">0s</div><div class="lbl">已连接</div></div>
+    <div class="stat-item"><div class="num" id="statReconn">0</div><div class="lbl">重连次数</div></div>
   </div>
 
   <!-- 服务器信息 -->
@@ -283,10 +412,55 @@
     </div>
   </div>
 
+  <!-- ESP32 实时状态 -->
+  <div class="esp32-status">
+    <div class="esp32-led-section">
+      <div class="esp32-led-lbl">ESP32 开关灯</div>
+      <div class="esp32-led-container">
+        <div class="esp32-led" id="esp32Led">
+          <div class="led-bulb" id="ledBulb"></div>
+          <div class="led-label" id="ledStateLabel">未知</div>
+        </div>
+        <div class="esp32-info" id="esp32Info">
+          <div class="esp32-info-row"><span class="key">状态主题:</span><span class="val" id="esp32StatusTopic">esp32/wokwi/led/status</span></div>
+          <div class="esp32-info-row"><span class="key">最后更新:</span><span class="val" id="esp32LastUpdate">--:--:--</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最后消息 -->
+  <div class="last-msg" id="lastMsgDisplay">
+    <span class="lbl">📤 最后发送:</span>
+    <span class="val" id="lastSentVal">(无)</span>
+    &nbsp;&nbsp;
+    <span class="lbl">📩 最后收到:</span>
+    <span class="val recv" id="lastRecvVal">(无)</span>
+  </div>
+
   <!-- 控制按钮 -->
   <div class="controls">
     <button class="btn btn-on" id="btnOn" disabled>🔴 ON</button>
     <button class="btn btn-off" id="btnOff" disabled>⚫ OFF</button>
+  </div>
+
+  <!-- 辅助工具栏 -->
+  <div class="toolbar">
+    <button class="btn-sm" id="btnSelfTest" disabled>🧪 自测</button>
+    <button class="btn-sm" id="btnContinuous" disabled>🔁 连续发送</button>
+    <button class="btn-sm" id="btnToggleDiag">📊 诊断</button>
+  </div>
+
+  <!-- 诊断面板 -->
+  <div class="diag-panel" id="diagPanel">
+    <div class="row"><span class="key">WebSocket URL</span><span class="val" id="diagUrl">-</span></div>
+    <div class="row"><span class="key">协议版本</span><span class="val" id="diagProto">-</span></div>
+    <div class="row"><span class="key">MQTT 版本</span><span class="val" id="diagMqttVer">-</span></div>
+    <div class="row"><span class="key">Clean Session</span><span class="val" id="diagClean">-</span></div>
+    <div class="row"><span class="key">Keepalive</span><span class="val" id="diagKeep">-</span></div>
+    <div class="row"><span class="key">Reconnect Period</span><span class="val" id="diagReconPeriod">-</span></div>
+    <div class="row"><span class="key">浏览器</span><span class="val" id="diagBrowser">-</span></div>
+    <div class="row"><span class="key">在线测试</span><span class="val" id="diagOnline">检测中...</span></div>
   </div>
 
   <!-- 消息日志 -->
@@ -304,39 +478,72 @@
 <script>
 // ===================== 配置 =====================
 const MQTT_CONFIG = {
-  server:   'wss://broker.hivemq.com:8884/mqtt',
-  topic:    'esp32/wokwi/led',
-  clientId: 'xin_html_controller_' + Math.random().toString(36).slice(2, 6),
+  server:      'wss://broker.hivemq.com:8884/mqtt',
+  topic:       'esp32/wokwi/led',
+  statusTopic: 'esp32/wokwi/led/status',
+  clientId:    'xin_html_' + Math.random().toString(36).slice(2, 8),
 };
 
 // ===================== DOM 引用 =====================
+const $ = id => document.getElementById(id);
 const dom = {
-  dot:         document.getElementById('statusDot'),
-  statusText:  document.getElementById('statusText'),
-  statusDetail:document.getElementById('statusDetail'),
-  clientId:    document.getElementById('clientIdDisplay'),
-  topic:       document.getElementById('topicDisplay'),
-  btnOn:       document.getElementById('btnOn'),
-  btnOff:      document.getElementById('btnOff'),
-  logBody:     document.getElementById('logBody'),
-  btnClear:    document.getElementById('btnClearLog'),
+  dot:            $('statusDot'),
+  statusText:     $('statusText'),
+  statusDetail:   $('statusDetail'),
+  clientId:       $('clientIdDisplay'),
+  topic:          $('topicDisplay'),
+  btnOn:          $('btnOn'),
+  btnOff:         $('btnOff'),
+  btnReconnect:   $('btnReconnect'),
+  btnSelfTest:    $('btnSelfTest'),
+  btnContinuous:  $('btnContinuous'),
+  btnToggleDiag:  $('btnToggleDiag'),
+  logBody:        $('logBody'),
+  btnClear:       $('btnClearLog'),
+  statSent:       $('statSent'),
+  statRecv:       $('statRecv'),
+  statUptime:     $('statUptime'),
+  statReconn:     $('statReconn'),
+  lastSentVal:    $('lastSentVal'),
+  lastRecvVal:    $('lastRecvVal'),
+  diagPanel:      $('diagPanel'),
+  diagUrl:        $('diagUrl'),
+  diagProto:      $('diagProto'),
+  diagMqttVer:    $('diagMqttVer'),
+  diagClean:      $('diagClean'),
+  diagKeep:       $('diagKeep'),
+  diagReconPeriod:$('diagReconPeriod'),
+  diagBrowser:    $('diagBrowser'),
+  diagOnline:     $('diagOnline'),
+  // ESP32 状态
+  ledBulb:        $('ledBulb'),
+  ledStateLabel:  $('ledStateLabel'),
+  esp32StatusTopic:$('esp32StatusTopic'),
+  esp32LastUpdate:$('esp32LastUpdate'),
 };
 
-// ===================== MQTT 客户端 =====================
+// ===================== 状态 =====================
 let client = null;
-let reconnectTimer = null;
+let stats = { sent: 0, recv: 0, reconn: 0 };
+let startTime = 0;
+let uptimeTimer = null;
+let continuousTimer = null;
+let continuousActive = false;
+let selfTestTimer = null;
 
-// 设置状态
+// ===================== 工具函数 =====================
+
 function setStatus(state, text, detail) {
   dom.dot.className = 'status-dot ' + state;
   dom.statusText.textContent = text;
   if (detail) dom.statusDetail.textContent = detail;
 }
 
-// 启用/禁用按钮
 function setButtonsEnabled(enabled) {
   dom.btnOn.disabled = !enabled;
   dom.btnOff.disabled = !enabled;
+  dom.btnSelfTest.disabled = !enabled;
+  dom.btnContinuous.disabled = !enabled;
 }
 
 // 添加日志
@@ -352,6 +559,7 @@ function addLog(tag, msg) {
   else if (tag === '📩') tagClass = 'tag-recv';
   else if (tag === 'ℹ️') tagClass = 'tag-info';
   else if (tag === '❌') tagClass = 'tag-err';
+  else if (tag === '✅') tagClass = 'tag-ok';
   entry.innerHTML = `<span class="time">[${time}]</span><span class="${tagClass}">${tag}</span> ${msg}`;
   dom.logBody.appendChild(entry);
   dom.logBody.scrollTop = dom.logBody.scrollHeight;
@@ -362,11 +570,87 @@ dom.btnClear.addEventListener('click', () => {
   dom.logBody.innerHTML = '<div class="log-empty">日志已清空</div>';
 });
 
+// 按钮按下反馈
+function flashButton(btn) {
+  btn.classList.add('sending');
+  setTimeout(() => btn.classList.remove('sending'), 300);
+}
+
+// ===================== ESP32 状态更新 =====================
+function updateESP32LED(state) {
+  const bulb = dom.ledBulb;
+  const label = dom.ledStateLabel;
+
+  // 移除所有状态类
+  bulb.classList.remove('on', 'off', 'unknown');
+  label.classList.remove('on', 'off');
+
+  if (state === 'on') {
+    bulb.classList.add('on');
+    label.classList.add('on');
+    label.textContent = '🟢 已打开';
+  } else if (state === 'off') {
+    bulb.classList.add('off');
+    label.classList.add('off');
+    label.textContent = '⚫ 已关闭';
+  } else {
+    bulb.classList.add('unknown');
+    label.textContent = '⏳ 未知';
+  }
+
+  // 更新时间戳
+  const now = new Date();
+  const time = now.toLocaleTimeString();
+  dom.esp32LastUpdate.textContent = time;
+  dom.esp32LastUpdate.classList.add('live');
+}
+
+// 更新统计
+function updateStats() {
+  dom.statSent.textContent = stats.sent;
+  dom.statRecv.textContent = stats.recv;
+  dom.statReconn.textContent = stats.reconn;
+  if (startTime > 0) {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    dom.statUptime.textContent = m > 0 ? `${m}m${s}s` : `${s}s`;
+  }
+}
+
+// ===================== 诊断面板 =====================
+dom.btnToggleDiag.addEventListener('click', () => {
+  dom.diagPanel.classList.toggle('visible');
+  dom.btnToggleDiag.textContent = dom.diagPanel.classList.contains('visible') ? '📊 隐藏诊断' : '📊 诊断';
+});
+
+function updateDiagnostics() {
+  dom.diagUrl.textContent = MQTT_CONFIG.server;
+  dom.diagProto.textContent = window.location.protocol;
+  dom.diagMqttVer.textContent = '5 (mqtt.js ' + (typeof mqtt !== 'undefined' ? mqtt.version || '?' : 'unloaded') + ')';
+  dom.diagClean.textContent = 'true';
+  dom.diagKeep.textContent = '30s';
+  dom.diagReconPeriod.textContent = '5000ms';
+  dom.diagBrowser.textContent = navigator.userAgent.slice(0, 80);
+  dom.diagOnline.textContent = navigator.onLine ? '✅ 在线' : '❌ 离线';
+}
+
+// 初始化诊断
+updateDiagnostics();
+
 // ===================== MQTT 连接 =====================
+let intentionalEnd = false;  // 标记主动断开，避免 close 事件误判
+
 function connectMQTT() {
   if (client) {
-    try { client.end(true); } catch(e) {}
+    intentionalEnd = true;
+    try {
+      client.end(true);
+      client.removeAllListeners();
+    } catch(e) {}
     client = null;
+    // 延迟重置标记，让 close 事件有时间处理
+    setTimeout(() => { intentionalEnd = false; }, 100);
   }
 
   setStatus('connecting', '连接中...', `正在连接 ${MQTT_CONFIG.server}`);
@@ -374,49 +658,100 @@ function connectMQTT() {
   setButtonsEnabled(false);
 
   addLog('ℹ️', `正在连接 ${MQTT_CONFIG.server} ...`);
+  updateDiagnostics();
 
   try {
     client = mqtt.connect(MQTT_CONFIG.server, {
       clientId: MQTT_CONFIG.clientId,
       clean: true,
-      reconnectPeriod: 5000,        // 断线后 5 秒重连
+      reconnectPeriod: 5000,
       connectTimeout: 10000,
       keepalive: 30,
     });
 
-    client.on('connect', () => {
+    client.on('connect', (connack) => {
       setStatus('connected', '✅ 已连接', `客户端: ${MQTT_CONFIG.clientId}`);
       setButtonsEnabled(true);
+
+      // 记录连接开始时间（仅在首次连接时）
+      if (startTime === 0) {
+        startTime = Date.now();
+        uptimeTimer = setInterval(updateStats, 1000);
+      }
+
       addLog('✅', `已连接到 broker.hivemq.com`);
 
-      // 订阅主题
-      client.subscribe(MQTT_CONFIG.topic, { qos: 0 }, (err) => {
+      // 获取连接信息
+      if (connack) {
+        const info = [];
+        if (connack.sessionPresent !== undefined) info.push(`sessionPresent=${connack.sessionPresent}`);
+        if (connack.protocolVersion !== undefined) info.push(`protoVer=${connack.protocolVersion}`);
+        if (connack.returnCode !== undefined) info.push(`returnCode=${connack.returnCode}`);
+        if (info.length > 0) addLog('ℹ️', `CONNACK: ${info.join(', ')}`);
+      }
+
+      // 订阅控制主题 (on/off 指令)
+      client.subscribe(MQTT_CONFIG.topic, { qos: 0 }, (err, granted) => {
         if (err) {
-          addLog('❌', `订阅失败: ${err.message}`);
+          addLog('❌', `订阅控制主题失败: ${err.message}`);
         } else {
-          addLog('📡', `已订阅 ${MQTT_CONFIG.topic}`);
+          const qos = (granted && granted[0]) ? granted[0].qos : 0;
+          addLog('📡', `已订阅控制 ${MQTT_CONFIG.topic} (QoS ${qos})`);
         }
       });
+
+      // 订阅 ESP32 状态主题 (led 实时状态反馈)
+      client.subscribe(MQTT_CONFIG.statusTopic, { qos: 0 }, (err, granted) => {
+        if (err) {
+          addLog('❌', `订阅状态主题失败: ${err.message}`);
+        } else {
+          const qos = (granted && granted[0]) ? granted[0].qos : 0;
+          addLog('📡', `已订阅状态 ${MQTT_CONFIG.statusTopic} (QoS ${qos})`);
+        }
+      });
+
+      // 重置 ESP32 状态为未知（等状态消息到达后更新）
+      updateESP32LED('unknown');
+
+      updateStats();
     });
 
-    client.on('message', (topic, payload) => {
+    client.on('message', (topic, payload, packet) => {
       const msg = payload.toString();
-      addLog('📩', `收到: "${msg}"  (主题: ${topic})`);
+      stats.recv++;
+      dom.lastRecvVal.textContent = msg;
+      updateStats();
+
+      // 判断是状态主题还是控制主题
+      if (topic === MQTT_CONFIG.statusTopic) {
+        // ESP32 发来的实时状态反馈
+        addLog('📩', `ESP32 状态: "${msg}"`);
+        updateESP32LED(msg);
+      } else {
+        // 控制主题的普通消息（自测回显）
+        addLog('📩', `收到: "${msg}"  (主题: ${topic})`);
+      }
     });
 
     client.on('reconnect', () => {
-      setStatus('connecting', '重连中...', '5 秒后自动重试');
+      stats.reconn++;
+      setStatus('connecting', '重连中...', `第 ${stats.reconn} 次重连`);
       setButtonsEnabled(false);
-      addLog('ℹ️', '连接断开，准备重连...');
+      addLog('ℹ️', `连接断开，第 ${stats.reconn} 次重连...`);
+      updateStats();
     });
 
     client.on('close', () => {
+      // 主动 end() 导致的关闭不改变 UI
+      if (intentionalEnd) return;
+      // mqtt.js 正在重连时也不显示断开
       if (client && client.connected) return;
       setStatus('disconnected', '已断开', '等待自动重连...');
       setButtonsEnabled(false);
     });
 
     client.on('offline', () => {
+      if (intentionalEnd) return;
       setStatus('disconnected', '离线', '网络连接丢失');
       setButtonsEnabled(false);
     });
@@ -433,6 +768,12 @@ function connectMQTT() {
   }
 }
 
+// ===================== 手动重连 =====================
+dom.btnReconnect.addEventListener('click', () => {
+  addLog('ℹ️', '手动触发重连...');
+  connectMQTT();
+});
+
 // ===================== 发送消息 =====================
 function sendMessage(msg) {
   if (!client || !client.connected) {
@@ -440,10 +781,17 @@ function sendMessage(msg) {
     return;
   }
 
+  // 找到对应的按钮
+  const btn = msg === 'on' ? dom.btnOn : dom.btnOff;
+  flashButton(btn);
+
   client.publish(MQTT_CONFIG.topic, msg, { qos: 0 }, (err) => {
     if (err) {
       addLog('❌', `发送 "${msg}" 失败: ${err.message}`);
     } else {
+      stats.sent++;
+      dom.lastSentVal.textContent = msg;
+      updateStats();
       addLog('📤', `发送 "${msg}"`);
     }
   });
@@ -452,10 +800,140 @@ function sendMessage(msg) {
 dom.btnOn.addEventListener('click', () => sendMessage('on'));
 dom.btnOff.addEventListener('click', () => sendMessage('off'));
 
+// ===================== 自测功能 =====================
+// 模拟 xin.py 的行为：依次发送 on / off，观察是否能收到自己发的消息
+dom.btnSelfTest.addEventListener('click', () => {
+  if (!client || !client.connected) {
+    addLog('❌', '未连接，无法自测');
+    return;
+  }
+
+  dom.btnSelfTest.disabled = true;
+  addLog('🧪', '========== 开始自测 ==========');
+  addLog('🧪', '步骤 1/4: 发送 "on"...');
+
+  // 先清空旧消息记录
+  const beforeCount = stats.recv;
+
+  client.publish(MQTT_CONFIG.topic, 'on', { qos: 0 }, (err1) => {
+    if (err1) {
+      addLog('❌', `自测失败: 发送 "on" 出错: ${err1.message}`);
+      dom.btnSelfTest.disabled = false;
+      return;
+    }
+    stats.sent++;
+    dom.lastSentVal.textContent = 'on';
+    updateStats();
+    addLog('📤', `[自测] 发送 "on"`);
+
+    // 等待 1.5 秒，检查是否收到自己的消息
+    setTimeout(() => {
+      const afterCount = stats.recv;
+      const received = afterCount - beforeCount;
+
+      if (received > 0) {
+        addLog('✅', `自测通过 ✅ 收到 ${received} 条回显消息（自订阅成功）`);
+      } else {
+        addLog('⚠️', `自测警告 ⚠️ 未收到回显消息，但消息已成功发布到服务器`);
+        addLog('ℹ️', `  原因可能: ESP32 未在线 / 主题不匹配 / 固件未更新`);
+      }
+
+      addLog('🧪', '步骤 2/4: 发送 "off"...');
+      const beforeCount2 = stats.recv;
+
+      client.publish(MQTT_CONFIG.topic, 'off', { qos: 0 }, (err2) => {
+        if (err2) {
+          addLog('❌', `自测失败: 发送 "off" 出错: ${err2.message}`);
+          dom.btnSelfTest.disabled = false;
+          return;
+        }
+        stats.sent++;
+        dom.lastSentVal.textContent = 'off';
+        updateStats();
+        addLog('📤', `[自测] 发送 "off"`);
+
+        setTimeout(() => {
+          const afterCount2 = stats.recv;
+          const received2 = afterCount2 - beforeCount2;
+
+          if (received2 > 0) {
+            addLog('✅', `自测通过 ✅ 收到 ${received2} 条回显消息`);
+          } else {
+            addLog('⚠️', `自测警告 ⚠️ 未收到回显消息`);
+          }
+
+          addLog('🧪', '========== 自测结束 ==========');
+          addLog('🧪', `统计: 发送=2, 接收=${stats.recv - beforeCount}`);
+          addLog('🧪', '提示: 如果自测发布成功但 ESP32 无响应:');
+          addLog('🧪', '  1. ESP32 固件需重新编译推送（非阻塞新版）');
+          addLog('🧪', '  2. 确认 ESP32 已连上 Wi-Fi 和 MQTT');
+          addLog('🧪', '  3. 检查 GitHub CI 是否已部署最新固件');
+          dom.btnSelfTest.disabled = false;
+        }, 1500);
+      });
+    }, 1500);
+  });
+});
+
+// ===================== 连续发送模式 =====================
+dom.btnContinuous.addEventListener('click', () => {
+  if (!client || !client.connected) {
+    addLog('❌', '未连接，无法启动连续发送');
+    return;
+  }
+
+  continuousActive = !continuousActive;
+
+  if (continuousActive) {
+    dom.btnContinuous.classList.add('active');
+    dom.btnContinuous.textContent = '⏹ 停止发送';
+    addLog('🔁', '连续发送模式已启动 (每 2 秒交替 on/off)');
+
+    let isOn = true;
+    sendMessage('on');
+    isOn = false;
+
+    continuousTimer = setInterval(() => {
+      if (!client || !client.connected) {
+        addLog('❌', '连续发送中断：连接断开');
+        stopContinuous();
+        return;
+      }
+      const msg = isOn ? 'on' : 'off';
+      sendMessage(msg);
+      isOn = !isOn;
+    }, 2000);
+  } else {
+    stopContinuous();
+  }
+});
+
+function stopContinuous() {
+  continuousActive = false;
+  if (continuousTimer) {
+    clearInterval(continuousTimer);
+    continuousTimer = null;
+  }
+  dom.btnContinuous.classList.remove('active');
+  dom.btnContinuous.textContent = '🔁 连续发送';
+  addLog('🔁', '连续发送已停止');
+}
+
 // ===================== 初始化 =====================
 dom.topic.textContent = MQTT_CONFIG.topic;
 connectMQTT();
+
+// 页面关闭前清理
+window.addEventListener('beforeunload', () => {
+  if (continuousTimer) clearInterval(continuousTimer);
+  if (uptimeTimer) clearInterval(uptimeTimer);
+  if (selfTestTimer) clearInterval(selfTestTimer);
+  if (client) {
+    try { client.end(true); } catch(e) {}
+  }
+});
 </script>
 </body>
 </html>
+
 
